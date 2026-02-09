@@ -63,4 +63,14 @@ class ConsumeCommand extends WorkCommand
 
         return Str::substr($consumerTag, 0, 255);
     }
+
+    /**
+     * Override parent's writeOutput to suppress console output.
+     * This allows structured logging (via LOG_CHANNEL) to work while
+     * preventing "RUNNING"/"DONE" messages from WorkCommand.
+     */
+    protected function writeOutput($job, $status, ?\Throwable $exception = null): void
+    {
+        // Intentionally empty - suppresses all WorkCommand console output
+    }
 }
