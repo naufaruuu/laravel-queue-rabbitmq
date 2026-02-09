@@ -1,3 +1,11 @@
+# naufaruu/laravel-queue-rabbitmq
+
+> **Fork Notice**: This is a fork of [vladimir-yuldashev/laravel-queue-rabbitmq](https://github.com/vyuldashev/laravel-queue-rabbitmq) **v14.4** with added `--quiet` flag support for `rabbitmq:consume` command.
+>
+> **Added Feature**: `--quiet` flag to suppress console output while maintaining structured JSON logging via Laravel's logging channels.
+
+---
+
 RabbitMQ Queue driver for Laravel
 ======================
 [![Latest Stable Version](https://poser.pugx.org/vladimir-yuldashev/laravel-queue-rabbitmq/v/stable?format=flat-square)](https://packagist.org/packages/vladimir-yuldashev/laravel-queue-rabbitmq)
