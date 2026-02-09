@@ -83,7 +83,7 @@ class Consumer extends Worker
         $connection = $this->manager->connection($connectionName);
 
         // Track last heartbeat log time
-        $heartbeatInterval = $connection->getHeartbeat() ?: 0;
+        $heartbeatInterval = $connection->getConnection()->getHeartbeat() ?: 0;
         $lastHeartbeatLog = time();
 
         $this->channel = $connection->getChannel();
