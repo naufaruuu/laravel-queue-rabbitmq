@@ -1,8 +1,68 @@
 # naufaruu/laravel-queue-rabbitmq
 
-> **Fork Notice**: This is a fork of [vladimir-yuldashev/laravel-queue-rabbitmq](https://github.com/vyuldashev/laravel-queue-rabbitmq) **v14.4** with added `--quiet` flag support for `rabbitmq:consume` command.
->
-> **Added Feature**: `--quiet` flag to suppress console output while maintaining structured JSON logging via Laravel's logging channels.
+> **Fork Notice**: This is a fork of [vladimir-yuldashev/laravel-queue-rabbitmq](https://github.com/vyuldashev/laravel-queue-rabbitmq) **v14.4** with console output suppression for clean structured logging.
+
+## What's Changed
+
+### Console Output Suppression
+
+**Problem:**
+The original `rabbitmq:consume` command extends Laravel's `WorkCommand`, which outputs console messages like "RUNNING" and "DONE" for each job. This creates noise in logs and makes it difficult to parse structured logging output (JSON logs via `LOG_CHANNEL`).
+
+**Solution:**
+Override `writeOutput()` method in `ConsumeCommand` to suppress WorkCommand's console output while preserving all structured logging via Laravel's logging channels.
+
+**Changes Made:**
+```php
+// src/Console/ConsumeCommand.php
+protected function writeOutput($job, $status, ?\Throwable $exception = null): void
+{
+    // Intentionally empty - suppresses all WorkCommand console output
+}
+```
+
+### Why This Matters
+
+**Before (Original):**
+```
+  2024-01-01 10:00:00 JobClassName ........................ RUNNING
+  2024-01-01 10:00:05 JobClassName ........................ DONE
+{"message":"Queued","context":{"job":"...","JID":"...","RID":"..."},...}
+{"message":"Done","context":{"time":4.5,"status":"FF"},...}
+```
+Mixed output: console messages + JSON logs
+
+**After (This Fork):**
+```
+{"message":"Queued","context":{"job":"...","JID":"...","RID":"..."},...}
+{"message":"Done","context":{"time":4.5,"status":"FF"},...}
+```
+Clean JSON-only output - perfect for log aggregators (ELK, Loki, etc.)
+
+### Use Case
+
+Ideal for:
+- Kubernetes/Docker environments with centralized logging
+- Applications using `LOG_CHANNEL` for structured JSON logging
+- Teams needing clean, parseable log output
+- Microservices with log aggregation pipelines
+
+### No Functionality Lost
+
+✅ All Laravel Worker features intact:
+- Memory limit checks
+- Graceful shutdown
+- Timeout enforcement
+- Max jobs limits
+- Signal handling
+
+✅ Your application's structured logging (via `LoggerTrait`, `Log::channel()`) continues to work normally.
+
+❌ Only WorkCommand's console output is suppressed.
+
+### CPU Usage Note
+
+This fork maintains the original non-blocking wait mode (~13% CPU with `--sleep=0.1`). This is a design choice to preserve Laravel Worker's lifecycle management capabilities. See [Issue #300](https://github.com/vyuldashev/laravel-queue-rabbitmq/issues/300) for discussion on blocking vs non-blocking modes.
 
 ---
 
