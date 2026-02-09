@@ -64,6 +64,75 @@ Ideal for:
 
 This fork maintains the original non-blocking wait mode (~13% CPU with `--sleep=0.1`). This is a design choice to preserve Laravel Worker's lifecycle management capabilities. See [Issue #300](https://github.com/vyuldashev/laravel-queue-rabbitmq/issues/300) for discussion on blocking vs non-blocking modes.
 
+## Usage
+
+### ⚠️ Important: Always Use `--sleep=0.1`
+
+**CRITICAL:** You must use `--sleep=0.1` (or higher) to prevent excessive CPU usage.
+
+```bash
+# ✅ CORRECT - ~13% CPU when idle
+php artisan rabbitmq:consume connection --queue=your-queue --sleep=0.1
+
+# ❌ WRONG - 100% CPU when idle!
+php artisan rabbitmq:consume connection --queue=your-queue --sleep=0
+```
+
+### Why Sleep Parameter Matters
+
+Due to non-blocking wait mode:
+- `--sleep=0`: Tight polling loop → **100% CPU** (checks thousands of times/second)
+- `--sleep=0.1`: Adds 100ms delay between checks → **~13% CPU** (acceptable overhead)
+- `--sleep=0.5`: Adds 500ms delay → **~3% CPU** (but slower response to new messages)
+
+**Recommended:** `--sleep=0.1` balances CPU efficiency with fast message response.
+
+### Example Supervisor Configuration
+
+```ini
+[program:rabbitmq-worker]
+command=php /var/www/artisan rabbitmq:consume rabbitmq-connection --queue=default --memory=128 --sleep=0.1 --timeout=60 --tries=3
+autostart=true
+autorestart=true
+user=www-data
+numprocs=1
+redirect_stderr=true
+stdout_logfile=/var/log/supervisor/rabbitmq-worker.log
+```
+
+### For Kubernetes/Docker
+
+```yaml
+command: ["php", "artisan", "rabbitmq:consume", "rabbitmq-connection", "--queue=default", "--memory=128", "--sleep=0.1", "--timeout=60", "--tries=3"]
+```
+
+### Environment Setup for Clean JSON Logs
+
+Set in `.env`:
+```bash
+LOG_CHANNEL=kubernetes  # Or any channel using custom JSON handlers
+```
+
+Configure custom log handlers in `config/logging.php`:
+```php
+'channels' => [
+    'kubernetes' => [
+        'driver' => 'stack',
+        'channels' => ['jsonout', 'jsonerr', 'sentrylogger'],
+    ],
+    'jsonout' => [
+        'driver' => 'custom',
+        'via' => App\Logger\StdoutStreamHandler::class,
+    ],
+    'jsonerr' => [
+        'driver' => 'custom',
+        'via' => App\Logger\StderrStreamHandler::class,
+    ],
+],
+```
+
+Now all logs will be clean JSON format! 🎉
+
 ---
 
 RabbitMQ Queue driver for Laravel
