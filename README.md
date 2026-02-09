@@ -64,6 +64,49 @@ Ideal for:
 
 This fork maintains the original non-blocking wait mode (~13% CPU with `--sleep=0.1`). This is a design choice to preserve Laravel Worker's lifecycle management capabilities. See [Issue #300](https://github.com/vyuldashev/laravel-queue-rabbitmq/issues/300) for discussion on blocking vs non-blocking modes.
 
+### Heartbeat Logging
+
+**Feature:**
+This fork adds automatic heartbeat logging to the consumer daemon loop. When a heartbeat interval is configured, the consumer will periodically log heartbeat activity.
+
+**Changes Made:**
+```php
+// src/Consumer.php - In daemon() method
+$heartbeatInterval = $connection->getHeartbeat() ?: 0;
+$lastHeartbeatLog = time();
+
+// Inside the daemon while loop:
+if ($heartbeatInterval > 0 && (time() - $lastHeartbeatLog) >= $heartbeatInterval) {
+    $this->container['log']->info(sprintf("write_heartbeat(%s)", $heartbeatInterval));
+    $lastHeartbeatLog = time();
+}
+```
+
+**Example Log Output:**
+```json
+{"message":"write_heartbeat(20)","context":{},"level":200,"level_name":"INFO","channel":"production","datetime":"2024-01-01T10:00:00.000000Z"}
+```
+
+**Configuration:**
+Set the heartbeat interval in your `config/queue.php`:
+```php
+'connections' => [
+    'rabbitmq' => [
+        'options' => [
+            'heartbeat' => 20,  // Logs every 20 seconds
+        ],
+    ],
+],
+```
+
+**Why This Matters:**
+- Monitor RabbitMQ connection health in your logs
+- Verify that heartbeat mechanism is working correctly
+- Detect connection issues early (missing heartbeats indicate problems)
+- Matches behavior from legacy hynospt/enqueue implementations
+
+**Note:** This logs the heartbeat interval periodically - the actual AMQP heartbeat frames are sent automatically by php-amqplib in the background.
+
 ## Usage
 
 ### ⚠️ Important: Always Use `--sleep=0.1`
