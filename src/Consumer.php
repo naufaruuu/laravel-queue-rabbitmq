@@ -82,6 +82,10 @@ class Consumer extends Worker
         /** @var RabbitMQQueue $connection */
         $connection = $this->manager->connection($connectionName);
 
+        // Track last heartbeat log time
+        $heartbeatInterval = $connection->getHeartbeat() ?: 0;
+        $lastHeartbeatLog = time();
+
         $this->channel = $connection->getChannel();
 
         $this->channel->basic_qos(
@@ -155,6 +159,12 @@ class Consumer extends Worker
                 $this->exceptions->report($exception);
 
                 $this->stopWorkerIfLostConnection($exception);
+            }
+
+            // Log heartbeat status periodically
+            if ($heartbeatInterval > 0 && (time() - $lastHeartbeatLog) >= $heartbeatInterval) {
+                $this->container['log']->info(sprintf("write_heartbeat(%s)", $heartbeatInterval));
+                $lastHeartbeatLog = time();
             }
 
             // If no job is got off the queue, we will need to sleep the worker.
