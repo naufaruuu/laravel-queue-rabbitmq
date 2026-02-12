@@ -99,6 +99,89 @@ Set the heartbeat interval in your `config/queue.php`:
 ],
 ```
 
+### Public `reconnect()` Method
+
+**Problem:**
+The original package has a `protected function reconnect()` in `RabbitMQQueue`, making it impossible to manually reconnect from job code when handling connection errors. This is needed for backward compatibility with packages that expect a public `reconnect()` method (like Enqueue).
+
+**Solution:**
+Changed the `reconnect()` method visibility from `protected` to `public` in `RabbitMQQueue` class.
+
+**Changes Made:**
+```php
+// src/Queue/RabbitMQQueue.php
+/**
+ * Reconnect to RabbitMQ server.
+ *
+ * This method is public for backward compatibility with Enqueue package.
+ * It reconnects using the original connection settings and creates a new channel.
+ *
+ * @throws Exception
+ */
+public function reconnect(): void
+{
+    // Reconnects using the original connection settings.
+    $this->getConnection()->reconnect();
+    // Create a new main channel because all old channels are removed.
+    $this->getChannel(true);
+}
+```
+
+**Usage Example:**
+```php
+use PhpAmqpLib\Exception\AMQPConnectionClosedException;
+use Illuminate\Support\Facades\App;
+
+try {
+    // Dispatch job
+    Bus::dispatch($job);
+} catch (AMQPConnectionClosedException $e) {
+    // Manually reconnect
+    $queue = App::make('queue');
+    $connection = $queue->connection('rabbitmq');
+    $connection->reconnect();
+
+    // Retry
+    Bus::dispatch($job);
+}
+```
+
+**Automatic Reconnection:**
+For even better reliability, create a custom queue class that automatically handles reconnection:
+
+```php
+namespace App\Utilities;
+
+use VladimirYuldashev\LaravelQueueRabbitMQ\Queue\RabbitMQQueue as BaseRabbitMQQueue;
+use PhpAmqpLib\Exception\AMQPConnectionClosedException;
+use PhpAmqpLib\Exception\AMQPChannelClosedException;
+use PhpAmqpLib\Exception\AMQPRuntimeException;
+
+class RabbitMQQueue extends BaseRabbitMQQueue
+{
+    protected function publishBasic($msg, $exchange = '', $destination = '', $mandatory = false, $immediate = false, $ticket = null): void
+    {
+        try {
+            parent::publishBasic($msg, $exchange, $destination, $mandatory, $immediate, $ticket);
+        } catch (AMQPConnectionClosedException|AMQPChannelClosedException|AMQPRuntimeException) {
+            $this->reconnect();  // Now accessible as public method
+            parent::publishBasic($msg, $exchange, $destination, $mandatory, $immediate, $ticket);
+        }
+    }
+}
+```
+
+Then configure it in `config/queue.php`:
+```php
+'connections' => [
+    'rabbitmq' => [
+        'driver' => 'rabbitmq',
+        'worker' => \App\Utilities\RabbitMQQueue::class,  // Use custom worker
+        'hosts' => [...],
+    ],
+],
+```
+
 **Why This Matters:**
 - Monitor RabbitMQ connection health in your logs
 - Verify that heartbeat mechanism is working correctly

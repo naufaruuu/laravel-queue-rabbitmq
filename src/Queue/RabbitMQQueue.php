@@ -770,9 +770,14 @@ class RabbitMQQueue extends Queue implements QueueContract, RabbitMQQueueContrac
     }
 
     /**
+     * Reconnect to RabbitMQ server.
+     *
+     * This method is public for backward compatibility with Enqueue package.
+     * It reconnects using the original connection settings and creates a new channel.
+     *
      * @throws Exception
      */
-    protected function reconnect(): void
+    public function reconnect(): void
     {
         // Reconnects using the original connection settings.
         $this->getConnection()->reconnect();
